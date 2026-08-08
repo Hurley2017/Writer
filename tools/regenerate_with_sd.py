@@ -5,6 +5,7 @@ Usage:
 """
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,7 +23,11 @@ def main():
         story = json.load(f)
 
     cfg = load_config()
-    out_dir = os.path.join(cfg["output"]["dir"], f"{os.path.basename(story_path)}-sd-images")
+    title = story.get("title", "story")
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", title).strip("-").lower()[:60] or "story"
+    import datetime
+    out_dir = os.path.join(cfg["output"]["dir"],
+                           f"{slug}-sd-{datetime.datetime.now():%Y%m%d-%H%M%S}")
     images_dir = os.path.join(out_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
 
@@ -67,7 +72,7 @@ def main():
     if story.get("epilogue"):
         paras("epilogue", story["epilogue"])
 
-    pdf_path = os.path.join(out_dir, f"{os.path.splitext(os.path.basename(story_path))[0]}.pdf")
+    pdf_path = os.path.join(out_dir, f"{slug}.pdf")
     pdfbuilder.build_pdf(story, images, pdf_path, opts={
         "image_interval": 1,
         "images_after_last": False,

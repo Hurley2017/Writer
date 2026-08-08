@@ -9,8 +9,10 @@ echo ============================================================
 echo.
 
 rem ---------------- locate Python ----------------
+rem Prefer the SD venv Python - it has torch + diffusers + reportlab
 set "PY="
-where py >nul 2>nul && set "PY=py -3"
+if exist "D:\stable-diffusion-webui\venv\Scripts\python.exe" set "PY=D:\stable-diffusion-webui\venv\Scripts\python.exe"
+if not defined PY ( where py >nul 2>nul && set "PY=py -3" )
 if not defined PY ( where python >nul 2>nul && set "PY=python" )
 if not defined PY ( if exist "C:\Users\tushe\AppData\Local\Python\pythoncore-3.14-64\python.exe" set "PY=C:\Users\tushe\AppData\Local\Python\pythoncore-3.14-64\python.exe" )
 if not defined PY (
@@ -18,14 +20,24 @@ if not defined PY (
     pause
     exit /b 1
 )
+echo Using Python: %PY%
+
+rem Redirect pip cache/temp to D: so large installs never fill the C: drive
+if not exist "D:\pipcache" mkdir "D:\pipcache" >nul 2>nul
+if not exist "D:\piptemp" mkdir "D:\piptemp" >nul 2>nul
+set "PIP_CACHE_DIR=D:\pipcache"
+set "TEMP=D:\piptemp"
+set "TMP=D:\piptemp"
 
 rem ---------------- check dependencies ----------------
-%PY% -c "import requests, PIL, reportlab, pymupdf" >nul 2>nul
+%PY% -c "import requests, PIL, reportlab, pymupdf, diffusers, torch" >nul 2>nul
 if errorlevel 1 (
     echo First run detected - installing required Python packages...
     %PY% -m pip install -r "%~dp0requirements.txt"
     if errorlevel 1 (
         echo [ERROR] Failed to install Python packages.
+        echo If torch is missing, install the CUDA build with:
+        echo   %PY% -m pip install torch --index-url https://download.pytorch.org/whl/cu128
         pause
         exit /b 1
     )
