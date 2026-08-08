@@ -1,0 +1,16 @@
+# Sample book - keep out of version control
+Second Light of March.pdf
+
+# Generated story books, images, and story JSON
+output/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Local calibration / preview artifacts
+tools/calib.pdf
+tools/preview/
+tools/preview_test/
