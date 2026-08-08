@@ -1,7 +1,7 @@
 {
   "lmstudio": {
     "base_url": "http://localhost:1234/v1",
-    "model": "",
+    "model": "llama-3.2-3b-instruct",
     "temperature_outline": 0.7,
     "temperature_story": 0.9,
     "max_tokens": 4096

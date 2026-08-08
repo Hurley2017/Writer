@@ -35,23 +35,48 @@ def slugify(text, maxlen=60):
     return s[:maxlen] or "story"
 
 
+def _model_ok(lm, model):
+    """Tiny probe to confirm a model actually loads and responds in LM Studio."""
+    try:
+        text = lm.chat(
+            [{"role": "user", "content": "Reply with exactly the single word: ok"}],
+            model=model, temperature=0, max_tokens=5, timeout=120,
+        )
+        return bool(text and "ok" in text.lower())
+    except LMStudioError:
+        return False
+
+
 def pick_model(lm, requested):
+    """Choose a model that actually works. Auto mode prefers the largest loaded
+    model, but skips any that fail to load/respond (e.g. out-of-memory crashes)."""
     models = lm.list_models()
     if not models:
         raise LMStudioError("LM Studio is running but returned no models. Load a model in LM Studio first.")
     preferred = [m for m in models if "embed" not in m.lower()]
     if not preferred:
         preferred = models
-    if requested:
-        if requested in models:
-            return requested
-        print(f"[!] Model '{requested}' not loaded; picking from available models.")
-    # prefer the largest loaded model for better story quality
-    def size_rank(name):
-        m = re.search(r"(\d+(?:\.\d+)?)b", name.lower())
-        return float(m.group(1)) if m else 0.0
-    preferred.sort(key=size_rank, reverse=True)
-    return preferred[0]
+
+    if requested and requested in models:
+        candidates = [requested] + [m for m in preferred if m != requested]
+    else:
+        def size_rank(name):
+            m = re.search(r"(\d+(?:\.\d+)?)b", name.lower())
+            return float(m.group(1)) if m else 0.0
+        candidates = sorted(preferred, key=size_rank, reverse=True)
+
+    failed = []
+    for m in candidates:
+        if _model_ok(lm, m):
+            if failed:
+                print(f"[!] Skipped model(s) that failed to load: {failed}")
+            return m
+        failed.append(m)
+    raise LMStudioError(
+        "None of the loaded models responded. Tried: "
+        + ", ".join(failed)
+        + ". Check in LM Studio that a model can actually load and run."
+    )
 
 
 def check_environment(cfg, args):

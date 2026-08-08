@@ -13,9 +13,10 @@ class LMStudio:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
-    def _post(self, path, payload):
+    def _post(self, path, payload, timeout=None):
+        timeout = timeout or self.timeout
         try:
-            resp = requests.post(self.base_url + path, json=payload, timeout=self.timeout)
+            resp = requests.post(self.base_url + path, json=payload, timeout=timeout)
         except requests.exceptions.ConnectionError as e:
             raise LMStudioError(
                 f"Cannot reach LM Studio at {self.base_url}. "
@@ -23,7 +24,7 @@ class LMStudio:
                 "(Developer tab -> Start Server)."
             ) from e
         except requests.exceptions.Timeout as e:
-            raise LMStudioError(f"LM Studio request timed out after {self.timeout}s.") from e
+            raise LMStudioError(f"LM Studio request timed out after {timeout}s.") from e
         if resp.status_code == 404:
             raise LMStudioError(
                 f"Model '{payload.get('model')}' not found on LM Studio. "
@@ -49,7 +50,8 @@ class LMStudio:
         except requests.exceptions.RequestException:
             return False
 
-    def chat(self, messages, model, temperature=0.8, max_tokens=4096, json_mode=False):
+    def chat(self, messages, model, temperature=0.8, max_tokens=4096, json_mode=False,
+             timeout=None):
         """Send a chat request; return the assistant text.
 
         json_mode=True requests a JSON object response via response_format;
@@ -65,7 +67,7 @@ class LMStudio:
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
-        data = self._post("/chat/completions", payload)
+        data = self._post("/chat/completions", payload, timeout=timeout)
         try:
             return data["choices"][0]["message"]["content"].strip()
         except (KeyError, IndexError) as e:
