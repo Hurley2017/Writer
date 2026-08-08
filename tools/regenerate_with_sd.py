@@ -1,6 +1,6 @@
-"""Regenerate all images for an existing story.json using the EMBEDDED Stable
-Diffusion model (diffusers, in-process - no server needed), then rebuild the PDF.
-Usage:
+"""Regenerate the COVER for an existing story.json using the EMBEDDED Stable
+Diffusion model (diffusers, in-process - no server needed), then rebuild the PDF
+with abstract paragraph dividers. Usage:
     py -3 -m tools.regenerate_with_sd <path-to-story.json>
 """
 import json
@@ -43,43 +43,18 @@ def main():
         return 1
 
     images = {}
-    title = story.get("title", "Story")
     cw, chh = cfg["imagegen"]["cover_size"]
-    print(f" - cover ...")
+    print(" - cover ...")
     images["cover"] = imagegen.generate_and_save(
         backend, story.get("cover_prompt", f"an atmospheric cover for '{title}'"),
         cw, chh, os.path.join(images_dir, "cover.png"), caption=title)
     images["back"] = images["cover"]
 
-    total = 0
-    def paras(prefix, chapter):
-        nonlocal total
-        prompts = chapter.get("image_prompts", []) or []
-        for i, p in enumerate(chapter.get("paragraphs", [])):
-            prompt = prompts[i] if i < len(prompts) and prompts[i] else p
-            total += 1
-            w, h = cfg["imagegen"]["width"], cfg["imagegen"]["height"]
-            print(f" - {prefix} p{i}: {prompt[:60]}...")
-            images[f"{prefix}_p{i}"] = imagegen.generate_and_save(
-                backend, prompt, w, h, os.path.join(images_dir, f"{prefix}_p{i}.png"),
-                caption=prompt)
-
-    if story.get("prologue"):
-        paras("prologue", story["prologue"])
-    for si, sec in enumerate(story.get("sections", [])):
-        for ci, ch in enumerate(sec.get("chapters", []), start=1):
-            paras(f"s{si}_c{ci}", ch)
-    if story.get("epilogue"):
-        paras("epilogue", story["epilogue"])
-
     pdf_path = os.path.join(out_dir, f"{slug}.pdf")
     pdfbuilder.build_pdf(story, images, pdf_path, opts={
-        "image_interval": 1,
-        "images_after_last": False,
-        "image_max_width": cfg["pdf"].get("image_max_width", 300),
-        "image_max_height": cfg["pdf"].get("image_max_height", 340),
+        "divider": cfg["pdf"].get("divider", True),
     })
-    print(f"\nDone! {total} images regenerated with SD.")
+    print(f"\nDone! Cover regenerated with SD.")
     print(f"PDF: {os.path.abspath(pdf_path)}")
     return 0
 

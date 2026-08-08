@@ -13,9 +13,6 @@ DEFAULTS = {
     "story": {
         "language": "English",
         "length": "medium",
-        "image_interval": 1,
-        "images_after_last_paragraph": False,
-        "max_total_images": 80,
     },
     "imagegen": {
         "backend": "auto",
@@ -35,7 +32,7 @@ DEFAULTS = {
         "cover_size": [768, 1088],
         "back_cover": "reuse",
     },
-    "pdf": {"image_max_width": 300, "image_max_height": 340},
+    "pdf": {"divider": True},
     "output": {"dir": "output", "open_pdf": True},
 }
 

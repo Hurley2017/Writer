@@ -3,7 +3,7 @@
 An AI agent that writes illustrated stories and renders them into a **PDF book** that
 matches the exact layout of your sample book (`Second Light of March.pdf`): A5 pages,
 Palatino Linotype typography, a cover, a contents page, section title pages, chapters
-with running headers, and illustrations placed **between paragraphs**.
+with running headers, and abstract ornaments between paragraphs (images only on the cover).
 
 ## How it works
 
@@ -14,17 +14,18 @@ story_writer.bat
 ┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
 │  Local LLM      │      │  Image model     │      │  PDF builder    │
 │  (LM Studio)    │ ───► │  (auto-detect)   │ ───► │  (reportlab)    │
-│  1. outline     │      │  per-paragraph   │      │  replicates the │
-│  2. chapters +  │      │  illustrations + │      │  sample layout  │
+│  1. outline     │      │  cover          │      │  replicates the │
+│  2. chapters    │      │  illustration   │      │  sample layout  │
 │     image ideas │      │  cover           │      │                 │
 └─────────────────┘      └──────────────────┘      └─────────────────┘
 ```
 
 1. **LM Studio (local LLM)** writes the story:
    - An outline (title, prologue, sections → chapters, epilogue, cover idea).
-   - Each chapter as a set of scene-paragraphs, plus a one-line **image prompt** per
-     paragraph (so the illustrations match the text).
-2. **Image generation** creates one illustration per paragraph and a full-bleed cover.
+   - Each chapter as a set of scene-paragraphs (plus a cover prompt).
+2. **Image generation** creates a full-bleed **cover** (and back cover). No
+   in-paragraph pictures — instead, small abstract ornaments are drawn between
+   paragraphs in the PDF.
 3. **PDF builder** lays everything out in the sample book's format and saves it to
    `output/`.
 
@@ -46,7 +47,9 @@ py -3 -m src.pipeline --genre "fantasy" --topic "a young cartographer maps an
 
 ## Choosing the image model
 
-Two ways to generate the illustrations:
+Image generation is used **only for the cover** (front + optional back); the story
+body uses small abstract ornaments between paragraphs, not pictures. Two ways to
+generate the cover:
 
 ### 1. Embedded Stable Diffusion (standalone — recommended)
 The SD model is loaded **directly inside the pipeline** (HuggingFace `diffusers`) — no
@@ -88,20 +91,18 @@ placeholder**.
 | `lmstudio` | `base_url`, `model` | LM Studio endpoint; `model` empty = auto-pick the largest loaded model |
 | `lmstudio` | `temperature_*` | Creativity for outline vs. story |
 | `story` | `language`, `length` | Story language and default length (`short`/`medium`/`long`) |
-| `story` | `image_interval` | Put an image after every N-th paragraph (1 = after every paragraph) |
-| `story` | `images_after_last_paragraph` | Also illustrate after the last paragraph of a chapter |
-| `story` | `max_total_images` | Safety cap on the number of images generated |
+| `pdf` | `divider` | Draw an abstract ornament between paragraphs (default `true`) |
 | `imagegen` | `backend`, `style_prompt`, `negative_prompt` | Image backend + art style keywords |
 | `imagegen` | `width`, `height`, `steps`, `cfg_scale`, `sampler` | SD WebUI settings |
-| `pdf` | `image_max_width/height` | Max displayed size of in-text illustrations |
+| `pdf` | `divider` | Abstract ornament between paragraphs (default `true`) |
 
 ## Output
 
 Each run creates `output/<title>-<timestamp>/` containing:
 
 - `<title>.pdf` — the finished book
-- `images/` — all generated illustrations (named `s<sec>_c<ch>_p<para>.png`)
-- `story.json` — the full story (paragraphs + image prompts) for reuse
+- `images/` — the generated cover (`cover.png`)
+- `story.json` — the full story (paragraphs) for reuse
 
 ## Project layout
 

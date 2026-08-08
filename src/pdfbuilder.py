@@ -24,8 +24,6 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
-    Image as RLImage,
-    KeepTogether,
     NextPageTemplate,
     PageBreak,
     PageTemplate,
@@ -247,42 +245,58 @@ class _StoryDoc(BaseDocTemplate):
 
 # ---------------------------------------------------------------- helpers
 
-def _sized_image(path, max_w, max_h):
-    from PIL import Image as PILImage
-    with PILImage.open(path) as im:
-        w, h = im.size
-    scale = min(max_w / w, max_h / h, 1.0)
-    rl = RLImage(path, width=w * scale, height=h * scale)
-    rl.hAlign = "CENTER"
-    return rl
-
-
 def _para(text, style):
     return Paragraph(sax.escape(text), style)
 
 
+class _Divider(Flowable):
+    """Small centered abstract ornament drawn between paragraphs (no pictures)."""
+
+    def __init__(self, width=60, height=16, color=colors.black):
+        super().__init__()
+        self.width = width
+        self.height = height
+        self.color = color
+        self.hAlign = "CENTER"
+
+    def wrap(self, availWidth, availHeight):
+        return (self.width, self.height)
+
+    def draw(self):
+        c = self.canv
+        c.saveState()
+        c.setStrokeColor(self.color)
+        c.setFillColor(self.color)
+        c.setLineWidth(0.6)
+        y = self.height / 2
+        cx = self.width / 2
+        c.line(cx - 26, y, cx - 8, y)
+        c.line(cx + 8, y, cx + 26, y)
+        r = 3.0
+        p = c.beginPath()
+        p.moveTo(cx, y + r)
+        p.lineTo(cx + r, y)
+        p.lineTo(cx, y - r)
+        p.lineTo(cx - r, y)
+        p.close()
+        c.drawPath(p, stroke=1, fill=1)
+        c.restoreState()
+
+
 def _add_chapter_body(flow, doc, chapter, images, prefix, opts):
     paras = chapter.get("paragraphs") or []
-    prompts = chapter.get("image_prompts") or []
     style = ParagraphStyle(
         "body", fontName=FONT, fontSize=9.5, leading=15,
         alignment=TA_JUSTIFY, spaceBefore=0, spaceAfter=11,
     )
+    divider = opts.get("divider", True)
     n = len(paras)
-    interval = max(1, opts.get("image_interval", 1))
-    after_last = opts.get("images_after_last", False)
     for i, p in enumerate(paras):
         flow.append(_para(p, style))
-        is_last = i == n - 1
-        if after_last or not is_last:
-            if (i + 1) % interval == 0:
-                img_path = images.get(f"{prefix}_p{i}")
-                if img_path and os.path.exists(img_path):
-                    flow.append(Spacer(0, 4))
-                    flow.append(KeepTogether(_sized_image(
-                        img_path, opts.get("image_max_width", 300),
-                        opts.get("image_max_height", 340))))
-                    flow.append(Spacer(0, 4))
+        if divider and i < n - 1:
+            flow.append(Spacer(0, 2))
+            flow.append(_Divider())
+            flow.append(Spacer(0, 2))
 
 
 def _make_contents_entries(story, page_numbers):

@@ -64,32 +64,16 @@ def main():
     backend = imagegen.Placeholder(cfg)
     story = demo_story()
 
-    # cover + back
+    # cover + back only (no in-paragraph pictures)
     images = {}
     images["cover"] = imagegen.generate_and_save(
         backend, "cover scene", 768, 1088, os.path.join(images_dir, "cover.png"),
         caption=story["title"])
     images["back"] = images["cover"]
 
-    # one placeholder image per paragraph
-    def paras(prefix, chapter):
-        for i in range(len(chapter["paragraphs"])):
-            images[f"{prefix}_p{i}"] = imagegen.generate_and_save(
-                backend, f"scene {i+1}", 640, 640,
-                os.path.join(images_dir, f"{prefix}_p{i}.png"), caption=f"{prefix} p{i+1}")
-
-    paras("prologue", story["prologue"])
-    for si, sec in enumerate(story["sections"]):
-        for ci, ch in enumerate(sec["chapters"], start=1):
-            paras(f"s{si}_c{ci}", ch)
-    paras("epilogue", story["epilogue"])
-
     pdf_path = os.path.join(OUT, "test-layout.pdf")
     pdfbuilder.build_pdf(story, images, pdf_path, opts={
-        "image_interval": 1,
-        "images_after_last": False,
-        "image_max_width": 300,
-        "image_max_height": 340,
+        "divider": True,
     })
     print("Wrote", pdf_path)
 

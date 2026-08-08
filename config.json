@@ -8,10 +8,7 @@
   },
   "story": {
     "language": "English",
-    "length": "medium",
-    "image_interval": 1,
-    "images_after_last_paragraph": false,
-    "max_total_images": 80
+    "length": "medium"
   },
   "imagegen": {
     "backend": "auto",
@@ -38,8 +35,7 @@
     "back_cover": "reuse"
   },
   "pdf": {
-    "image_max_width": 300,
-    "image_max_height": 340
+    "divider": true
   },
   "output": {
     "dir": "output",

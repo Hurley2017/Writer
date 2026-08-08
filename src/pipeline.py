@@ -213,9 +213,9 @@ def main(argv=None):
         story["epilogue"] = {"title": "The Closing", "paragraphs": data["paragraphs"],
                              "image_prompts": data.get("image_prompts", [])}
 
-    # ---------------- 3. images ----------------
+    # ---------------- 3. images (cover only) ----------------
     backend, backend_id = imagegen.create_backend(cfg)
-    print(f"\n[3/4] Generating illustrations ({backend_id} backend) ...")
+    print(f"\n[3/4] Generating the cover illustration ({backend_id} backend) ...")
 
     out_dir = os.path.join(cfg["output"]["dir"], f"{slugify(title)}-{datetime.datetime.now():%Y%m%d-%H%M%S}")
     images_dir = os.path.join(out_dir, "images")
@@ -236,48 +236,12 @@ def main(argv=None):
             backend, f"{cover_prompt}, quiet and atmospheric end-of-book mood", cw, chh,
             os.path.join(images_dir, "back.png"), caption=title)
 
-    # per-paragraph images
-    interval = max(1, int(cfg["story"].get("image_interval", 1)))
-    after_last = bool(cfg["story"].get("images_after_last_paragraph", False))
-    max_total = int(cfg["story"].get("max_total_images", 80))
-    total = 0
-
-    def gen_paras_images(prefix, chapter, si=None, ch_num=None):
-        nonlocal total
-        paras = chapter.get("paragraphs", [])
-        prompts = chapter.get("image_prompts", []) or []
-        for i, p in enumerate(paras):
-            is_last = i == len(paras) - 1
-            if (not after_last and is_last) or (i + 1) % interval != 0:
-                continue
-            if total >= max_total:
-                print(f"      (stopped at {max_total} images - raise max_total_images in config.json if needed)")
-                return
-            prompt = prompts[i] if i < len(prompts) and prompts[i] else p
-            total += 1
-            w, h = cfg["imagegen"]["width"], cfg["imagegen"]["height"]
-            print(f"      - image {total}: paragraph {i+1} of {prefix}")
-            images[f"{prefix}_p{i}"] = imagegen.generate_and_save(
-                backend, prompt, w, h,
-                os.path.join(images_dir, f"{prefix}_p{i}.png"), caption=prompt)
-
-    if story["prologue"]:
-        gen_paras_images("prologue", story["prologue"])
-    for si, sec in enumerate(story["sections"]):
-        for ci, ch in enumerate(sec["chapters"], start=1):
-            gen_paras_images(f"s{si}_c{ci}", ch)
-    if story["epilogue"]:
-        gen_paras_images("epilogue", story["epilogue"])
-
     # ---------------- 4. PDF ----------------
     print("\n[4/4] Building the PDF ...")
     pdf_name = f"{slugify(title)}.pdf"
     pdf_path = os.path.join(out_dir, pdf_name)
     pdfbuilder.build_pdf(story, images, pdf_path, opts={
-        "image_interval": interval,
-        "images_after_last": after_last,
-        "image_max_width": cfg["pdf"].get("image_max_width", 300),
-        "image_max_height": cfg["pdf"].get("image_max_height", 340),
+        "divider": cfg["pdf"].get("divider", True),
     })
 
     # save the story for reproducibility
@@ -288,7 +252,7 @@ def main(argv=None):
     print("Done!")
     print(f"  Story : {title}")
     print(f"  Pages : {pdfbuilder_summary(pdf_path)}")
-    print(f"  Images: {total}")
+    print(f"  Cover : {os.path.basename(images.get('cover', ''))}")
     print(f"  PDF   : {os.path.abspath(pdf_path)}")
     print("=" * 60)
 
