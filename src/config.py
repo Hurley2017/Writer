@@ -29,6 +29,7 @@ DEFAULTS = {
         "sdwebui_url": "http://127.0.0.1:7860",
         "comfyui_url": "http://127.0.0.1:8188",
         "comfyui_workflow_file": "",
+        "diffusers": {"model_path": ""},
         "openai": {"api_key": "", "base_url": "https://api.openai.com/v1",
                    "image_model": "gpt-image-1", "size": "1024x1024"},
         "cover_size": [768, 1088],

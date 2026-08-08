@@ -46,25 +46,40 @@ py -3 -m src.pipeline --genre "fantasy" --topic "a young cartographer maps an
 
 ## Choosing the image model
 
-LM Studio serves text models only, so illustrations need a separate backend.
-`config.json → imagegen.backend` can be `auto` (default), `sdwebui`, `comfyui`,
-`openai`, or `placeholder`. Auto-detection order:
+Two ways to generate the illustrations:
+
+### 1. Embedded Stable Diffusion (standalone — recommended)
+The SD model is loaded **directly inside the pipeline** (HuggingFace `diffusers`) — no
+separate server needed. Everything runs in one command and produces the PDF.
+
+1. Install torch with CUDA support (once):
+   ```bat
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+   pip install diffusers transformers accelerate safetensors
+   ```
+2. Put any SD 1.5/SDXL `.safetensors` checkpoint somewhere and point
+   `config.json → imagegen.diffusers.model_path` at it.
+3. Run `story_writer.bat` (option 2 in the advanced menu) or
+   `py -3 -m src.pipeline --backend diffusers ...`.
+
+### 2. Image server (optional)
+LM Studio serves text models only, so you can instead run a separate image server.
+`config.json → imagegen.backend` can be `auto`, `diffusers`, `sdwebui`, `comfyui`,
+`openai`, or `placeholder`. Auto-detection order: **diffusers → sdwebui → comfyui →
+placeholder**.
 
 | Backend | What it is | Requirement |
 |---|---|---|
+| `diffusers` | Embedded SD (standalone) | torch + diffusers installed, model file in `config.json` |
 | `sdwebui` | Stable Diffusion WebUI (AUTOMATIC1111) | Run it locally, default port **7860** |
 | `comfyui` | ComfyUI | Run it locally, port **8188**, plus an API-format workflow JSON path in `config.json` |
 | `openai` | DALL-E / `gpt-image-1` | Put an API key in `config.json → imagegen.openai.api_key` |
 | `placeholder` | gradient cards with captions | none — used for testing |
 
-The pipeline picks the first available backend automatically. To get real artwork,
-install and start **Stable Diffusion WebUI**:
-
-```bat
-git clone https://github.com/AUTOMATIC1111/stable-diffusion-webui
-cd stable-diffusion-webui
-webui.bat --api        :: keep it running, then start story_writer.bat
-```
+> **Note for RTX 50-series (Blackwell) GPUs**: you need torch ≥ 2.7, e.g.
+> `pip install torch --index-url https://download.pytorch.org/whl/cu128`.
+> Older AUTOMATIC1111 installs pin torch 2.1.2, which neither supports Python 3.14
+> nor Blackwell GPUs.
 
 ## Configuration (`config.json`)
 

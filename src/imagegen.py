@@ -1,12 +1,14 @@
 """Image generation backends for the story illustrations.
 
 Supported backends:
-  - sdwebui     : local Stable Diffusion WebUI (AUTOMATIC1111)  http://127.0.0.1:7860
-  - comfyui     : local ComfyUI (needs an API-format workflow JSON)  http://127.0.0.1:8188
-  - openai      : OpenAI Images API (DALL-E / gpt-image-1), needs an API key
-  - placeholder : built-in gradient + caption images, no server needed (for testing)
+  - diffusers  : EMBEDDED Stable Diffusion (HuggingFace diffusers) - loads the SD
+                 model directly in-process, no server needed (standalone)
+  - sdwebui    : local Stable Diffusion WebUI (AUTOMATIC1111)  http://127.0.0.1:7860
+  - comfyui    : local ComfyUI (needs an API-format workflow JSON)  http://127.0.0.1:8188
+  - openai     : OpenAI Images API (DALL-E / gpt-image-1), needs an API key
+  - placeholder: built-in gradient + caption images (fallback for testing)
 
-"auto" tries sdwebui -> comfyui -> placeholder.
+"auto" tries diffusers (if a model is configured) -> sdwebui -> comfyui -> placeholder.
 """
 import base64
 import io
@@ -24,11 +26,25 @@ def detect_backend(cfg, force=None):
     if requested != "auto":
         return requested
     g = cfg["imagegen"]
+    if _diffusers_available(cfg):
+        return "diffusers"
     if _reachable(g["sdwebui_url"] + "/sdapi/v1/sd-models", timeout=5):
         return "sdwebui"
     if _reachable(g["comfyui_url"] + "/system_stats", timeout=5):
         return "comfyui"
     return "placeholder"
+
+
+def _diffusers_available(cfg):
+    """True if a local SD model file is configured and diffusers is installed."""
+    model_path = cfg["imagegen"].get("diffusers", {}).get("model_path", "")
+    if not model_path or not os.path.exists(model_path):
+        return False
+    try:
+        import diffusers  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 def _reachable(url, timeout=5):
@@ -37,6 +53,67 @@ def _reachable(url, timeout=5):
         return True
     except requests.exceptions.RequestException:
         return False
+
+
+class DiffusersSD:
+    """Embedded Stable Diffusion via HuggingFace diffusers - standalone, no server.
+
+    Loads a single-file SD checkpoint directly on the GPU and generates images
+    in-process while the pipeline builds the PDF.
+    """
+
+    def __init__(self, cfg):
+        g = cfg["imagegen"]
+        self.model_path = g.get("diffusers", {}).get("model_path", "")
+        self.style = g.get("style_prompt", "")
+        self.negative = g.get("negative_prompt", "")
+        self.steps = g.get("steps", 24)
+        self.cfg_scale = g.get("cfg_scale", 7)
+        self.sampler = g.get("sampler", "DPM++ 2M Karras")
+        self._pipe = None
+        if not self.model_path or not os.path.exists(self.model_path):
+            raise RuntimeError(
+                "Diffusers backend needs a local SD model. Set "
+                "config.json -> imagegen.diffusers.model_path to a .safetensors checkpoint."
+            )
+
+    def _get_pipe(self):
+        if self._pipe is not None:
+            return self._pipe
+        import torch
+        from diffusers import StableDiffusionPipeline
+        from diffusers.schedulers import DPMSolverMultistepScheduler
+
+        try:
+            pipe = StableDiffusionPipeline.from_single_file(
+                self.model_path,
+                torch_dtype=torch.float16,
+                safety_checker=None,
+                requires_safety_checker=False,
+                use_safetensors=True,
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to load SD model from {self.model_path}: {e}") from e
+        try:
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+        except Exception:
+            pass
+        pipe = pipe.to("cuda")
+        pipe.enable_attention_slicing()  # keeps VRAM usage low on 8 GB cards
+        self._pipe = pipe
+        return pipe
+
+    def generate(self, prompt, width, height):
+        pipe = self._get_pipe()
+        image = pipe(
+            prompt=f"{prompt}, {self.style}",
+            negative_prompt=self.negative,
+            num_inference_steps=self.steps,
+            guidance_scale=self.cfg_scale,
+            width=width,
+            height=height,
+        ).images[0]
+        return image.convert("RGB")
 
 
 class SDWebUI:
@@ -214,6 +291,8 @@ class Placeholder:
 def create_backend(cfg, force=None):
     backend = detect_backend(cfg, force=force)
     g = cfg["imagegen"]
+    if backend == "diffusers":
+        return DiffusersSD(cfg), backend
     if backend == "sdwebui":
         return SDWebUI(cfg), backend
     if backend == "comfyui":

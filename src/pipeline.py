@@ -95,16 +95,20 @@ def check_environment(cfg, args):
         print(f"[X] LM Studio NOT reachable at {cfg['lmstudio']['base_url']}")
 
     backend = imagegen.detect_backend(cfg, force=args.backend)
-    names = {"sdwebui": "Stable Diffusion WebUI (local)",
+    names = {"diffusers": "EMBEDDED Stable Diffusion (diffusers, standalone)",
+             "sdwebui": "Stable Diffusion WebUI (local)",
              "comfyui": "ComfyUI (local)",
              "openai": "OpenAI Images API",
              "placeholder": "placeholder images (no server)"}
     print(f"[OK] Image backend selected: {names.get(backend, backend)}")
-    if backend == "placeholder":
-        print("     No local image server detected. Install & run Stable Diffusion WebUI")
-        print("     (https://github.com/AUTOMATIC1111/stable-diffusion-webui) for real art,")
-        print("     or add an OpenAI key in config.json to use DALL-E.")
-    for mod in ("requests", "PIL", "reportlab", "pymupdf"):
+    if backend == "diffusers":
+        mp = cfg["imagegen"].get("diffusers", {}).get("model_path", "")
+        print(f"     Model: {mp}")
+    elif backend == "placeholder":
+        print("     No SD model configured and no image server detected.")
+        print("     Set config.json -> imagegen.diffusers.model_path to a .safetensors checkpoint")
+        print("     (and install torch + diffusers) for real art, or use an OpenAI key.")
+    for mod in ("requests", "PIL", "reportlab", "pymupdf", "diffusers", "torch"):
         try:
             __import__(mod)
             print(f"[OK] Python package: {mod}")

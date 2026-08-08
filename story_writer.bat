@@ -70,16 +70,18 @@ if "%ADV%"=="2" (
     if not "!MCH!"=="0" if not "!MCH!"=="" set "EXTRA=!EXTRA! --model !MCH!"
     echo.
     echo Image backend:
-    echo   [1] Auto-detect (Stable Diffusion WebUI, then ComfyUI, then placeholder)
-    echo   [2] Stable Diffusion WebUI (local server on port 7860)
-    echo   [3] ComfyUI (local server on port 8188)
-    echo   [4] OpenAI images / DALL-E (needs API key in config.json)
-    echo   [5] Placeholder images (no server needed)
-    set /p BCH="Choose (1-5, default 1): "
-    if "!BCH!"=="2" set "EXTRA=!EXTRA! --backend sdwebui"
-    if "!BCH!"=="3" set "EXTRA=!EXTRA! --backend comfyui"
-    if "!BCH!"=="4" set "EXTRA=!EXTRA! --backend openai"
-    if "!BCH!"=="5" set "EXTRA=!EXTRA! --backend placeholder"
+    echo   [1] Auto (embedded diffusers if a model is set, else server, else placeholder)
+    echo   [2] Embedded Stable Diffusion (diffusers, standalone - recommended)
+    echo   [3] Stable Diffusion WebUI (local server on port 7860)
+    echo   [4] ComfyUI (local server on port 8188)
+    echo   [5] OpenAI images / DALL-E (needs API key in config.json)
+    echo   [6] Placeholder images (no model needed)
+    set /p BCH="Choose (1-6, default 1): "
+    if "!BCH!"=="2" set "EXTRA=!EXTRA! --backend diffusers"
+    if "!BCH!"=="3" set "EXTRA=!EXTRA! --backend sdwebui"
+    if "!BCH!"=="4" set "EXTRA=!EXTRA! --backend comfyui"
+    if "!BCH!"=="5" set "EXTRA=!EXTRA! --backend openai"
+    if "!BCH!"=="6" set "EXTRA=!EXTRA! --backend placeholder"
 )
 
 rem sanitize dangerous chars in free-text inputs
