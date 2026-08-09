@@ -12,18 +12,21 @@
   },
   "imagegen": {
     "backend": "auto",
-    "style_prompt": "digital storybook illustration, cinematic lighting, rich colors, detailed, high quality",
-    "negative_prompt": "text, watermark, signature, logo, words, letters, captions, low quality, blurry, distorted, deformed, extra limbs, bad anatomy",
+    "style_prompt": "photorealistic, ultra detailed, professional photography, sharp focus, natural lighting, realistic textures, 8k uhd, film photography",
+    "negative_prompt": "illustration, painting, cartoon, anime, drawing, 3d render, text, watermark, signature, logo, words, letters, low quality, blurry, distorted, deformed, ugly, bad hands, missing fingers, extra limbs, bad anatomy, jpeg artifacts, oversaturated",
     "width": 640,
     "height": 640,
-    "steps": 24,
+    "steps": 32,
     "cfg_scale": 7,
     "sampler": "DPM++ 2M Karras",
+    "seed": -1,
     "sdwebui_url": "http://127.0.0.1:7860",
     "comfyui_url": "http://127.0.0.1:8188",
     "comfyui_workflow_file": "",
     "diffusers": {
-      "model_path": "D:\\stable-diffusion-webui\\models\\Stable-diffusion\\v1-5-pruned-emaonly.safetensors"
+      "model_name": "",
+      "model_path": "D:\\stable-diffusion-webui\\models\\Stable-diffusion\\Realistic_Vision_V5.1_fp16-no-ema.safetensors",
+      "hf_cache_dir": "D:\\hf_cache"
     },
     "openai": {
       "api_key": "",

@@ -36,9 +36,11 @@ def detect_backend(cfg, force=None):
 
 
 def _diffusers_available(cfg):
-    """True if a local SD model file is configured and diffusers is installed."""
-    model_path = cfg["imagegen"].get("diffusers", {}).get("model_path", "")
-    if not model_path or not os.path.exists(model_path):
+    """True if a local SD model is configured (HF repo id or single file) and diffusers is installed."""
+    d = cfg["imagegen"].get("diffusers", {})
+    model_name = d.get("model_name", "")
+    model_path = d.get("model_path", "")
+    if not model_name and (not model_path or not os.path.exists(model_path)):
         return False
     try:
         import diffusers  # noqa: F401
@@ -58,23 +60,31 @@ def _reachable(url, timeout=5):
 class DiffusersSD:
     """Embedded Stable Diffusion via HuggingFace diffusers - standalone, no server.
 
-    Loads a single-file SD checkpoint directly on the GPU and generates images
-    in-process while the pipeline builds the PDF.
+    Loads a fine-tuned SD model (e.g. DreamShaper) either from a HuggingFace repo id
+    (model_name) or a local single-file checkpoint (model_path), then generates images
+    in-process on the GPU.
     """
 
     def __init__(self, cfg):
         g = cfg["imagegen"]
-        self.model_path = g.get("diffusers", {}).get("model_path", "")
+        d = g.get("diffusers", {})
+        self.model_name = d.get("model_name", "") or ""
+        self.model_path = d.get("model_path", "") or ""
+        self.hf_cache_dir = d.get("hf_cache_dir", "") or ""
         self.style = g.get("style_prompt", "")
         self.negative = g.get("negative_prompt", "")
         self.steps = g.get("steps", 24)
         self.cfg_scale = g.get("cfg_scale", 7)
         self.sampler = g.get("sampler", "DPM++ 2M Karras")
+        self.seed = int(g.get("seed", -1))
         self._pipe = None
-        if not self.model_path or not os.path.exists(self.model_path):
+        if self.hf_cache_dir:
+            os.environ.setdefault("HF_HOME", self.hf_cache_dir)
+            os.environ.setdefault("HF_HUB_CACHE", os.path.join(self.hf_cache_dir, "hub"))
+        if not self.model_name and (not self.model_path or not os.path.exists(self.model_path)):
             raise RuntimeError(
-                "Diffusers backend needs a local SD model. Set "
-                "config.json -> imagegen.diffusers.model_path to a .safetensors checkpoint."
+                "Diffusers backend needs a model. Set imagegen.diffusers.model_name "
+                "(HuggingFace repo id) or imagegen.diffusers.model_path (.safetensors) in config.json."
             )
 
     def _get_pipe(self):
@@ -84,7 +94,26 @@ class DiffusersSD:
         from diffusers import StableDiffusionPipeline
         from diffusers.schedulers import DPMSolverMultistepScheduler
 
-        try:
+        pipe = None
+        if self.model_name:
+            try:
+                print(f"      Loading model '{self.model_name}' (first time downloads ~2 GB)...")
+                pipe = StableDiffusionPipeline.from_pretrained(
+                    self.model_name,
+                    torch_dtype=torch.float16,
+                    variant="fp16",
+                    safety_checker=None,
+                    requires_safety_checker=False,
+                )
+            except Exception as e:
+                print(f"[!] Failed to load '{self.model_name}': {e}")
+                pipe = None
+        if pipe is None:
+            if not self.model_path or not os.path.exists(self.model_path):
+                raise RuntimeError(
+                    "No SD model available. Set imagegen.diffusers.model_name or "
+                    "imagegen.diffusers.model_path in config.json."
+                )
             pipe = StableDiffusionPipeline.from_single_file(
                 self.model_path,
                 torch_dtype=torch.float16,
@@ -92,19 +121,28 @@ class DiffusersSD:
                 requires_safety_checker=False,
                 use_safetensors=True,
             )
-        except Exception as e:
-            raise RuntimeError(f"Failed to load SD model from {self.model_path}: {e}") from e
         try:
-            pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config)
+            pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                pipe.scheduler.config, use_karras_sigmas=True, algorithm_type="dpmsolver++"
+            )
         except Exception:
             pass
         pipe = pipe.to("cuda")
         pipe.enable_attention_slicing()  # keeps VRAM usage low on 8 GB cards
+        try:
+            pipe.enable_vae_slicing()
+            pipe.enable_vae_tiling()
+        except Exception:
+            pass
         self._pipe = pipe
         return pipe
 
     def generate(self, prompt, width, height):
         pipe = self._get_pipe()
+        import torch
+        generator = None
+        if self.seed >= 0:
+            generator = torch.Generator(device="cuda").manual_seed(self.seed)
         image = pipe(
             prompt=f"{prompt}, {self.style}",
             negative_prompt=self.negative,
@@ -112,6 +150,7 @@ class DiffusersSD:
             guidance_scale=self.cfg_scale,
             width=width,
             height=height,
+            generator=generator,
         ).images[0]
         return image.convert("RGB")
 

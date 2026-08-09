@@ -29,6 +29,11 @@ set "PIP_CACHE_DIR=D:\pipcache"
 set "TEMP=D:\piptemp"
 set "TMP=D:\piptemp"
 
+rem Redirect the HuggingFace model cache to D: as well
+if not exist "D:\hf_cache" mkdir "D:\hf_cache" >nul 2>nul
+set "HF_HOME=D:\hf_cache"
+set "HF_HUB_CACHE=D:\hf_cache\hub"
+
 rem ---------------- check dependencies ----------------
 %PY% -c "import requests, PIL, reportlab, pymupdf, diffusers, torch" >nul 2>nul
 if errorlevel 1 (
