@@ -35,6 +35,11 @@ def detect_backend(cfg, force=None):
     return "placeholder"
 
 
+def _is_xl_path(path):
+    """Heuristic: SDXL single-file checkpoints usually contain 'XL' in the name."""
+    return "xl" in os.path.basename(path).lower()
+
+
 def _diffusers_available(cfg):
     """True if a local SD model is configured (HF repo id or single file) and diffusers is installed."""
     d = cfg["imagegen"].get("diffusers", {})
@@ -71,6 +76,7 @@ class DiffusersSD:
         self.model_name = d.get("model_name", "") or ""
         self.model_path = d.get("model_path", "") or ""
         self.hf_cache_dir = d.get("hf_cache_dir", "") or ""
+        self.cpu_offload = bool(d.get("cpu_offload", False))
         self.style = g.get("style_prompt", "")
         self.negative = g.get("negative_prompt", "")
         self.steps = g.get("steps", 24)
@@ -91,14 +97,15 @@ class DiffusersSD:
         if self._pipe is not None:
             return self._pipe
         import torch
-        from diffusers import StableDiffusionPipeline
+        from diffusers import AutoPipelineForText2Image
+        from diffusers import StableDiffusionPipeline, StableDiffusionXLPipeline
         from diffusers.schedulers import DPMSolverMultistepScheduler
 
         pipe = None
         if self.model_name:
             try:
-                print(f"      Loading model '{self.model_name}' (first time downloads ~2 GB)...")
-                pipe = StableDiffusionPipeline.from_pretrained(
+                print(f"      Loading model '{self.model_name}' (first time downloads ~2-6 GB)...")
+                pipe = AutoPipelineForText2Image.from_pretrained(
                     self.model_name,
                     torch_dtype=torch.float16,
                     variant="fp16",
@@ -114,7 +121,8 @@ class DiffusersSD:
                     "No SD model available. Set imagegen.diffusers.model_name or "
                     "imagegen.diffusers.model_path in config.json."
                 )
-            pipe = StableDiffusionPipeline.from_single_file(
+            pipe_cls = StableDiffusionXLPipeline if _is_xl_path(self.model_path) else StableDiffusionPipeline
+            pipe = pipe_cls.from_single_file(
                 self.model_path,
                 torch_dtype=torch.float16,
                 safety_checker=None,
@@ -127,6 +135,18 @@ class DiffusersSD:
             )
         except Exception:
             pass
+        is_xl = "XL" in pipe.__class__.__name__
+        if self.cpu_offload or is_xl:
+            # SDXL on 8 GB: keep peak VRAM low by offloading components to CPU/RAM
+            try:
+                pipe.enable_attention_slicing()
+                pipe.enable_vae_slicing()
+                pipe.enable_vae_tiling()
+                pipe.enable_model_cpu_offload()
+                self._pipe = pipe
+                return pipe
+            except Exception:
+                pass
         pipe = pipe.to("cuda")
         pipe.enable_attention_slicing()  # keeps VRAM usage low on 8 GB cards
         try:
@@ -138,21 +158,38 @@ class DiffusersSD:
         return pipe
 
     def generate(self, prompt, width, height):
-        pipe = self._get_pipe()
         import torch
+        pipe = self._get_pipe()
         generator = None
         if self.seed >= 0:
             generator = torch.Generator(device="cuda").manual_seed(self.seed)
-        image = pipe(
-            prompt=f"{prompt}, {self.style}",
-            negative_prompt=self.negative,
-            num_inference_steps=self.steps,
-            guidance_scale=self.cfg_scale,
-            width=width,
-            height=height,
-            generator=generator,
-        ).images[0]
-        return image.convert("RGB")
+        try:
+            image = pipe(
+                prompt=f"{prompt}, {self.style}",
+                negative_prompt=self.negative,
+                num_inference_steps=self.steps,
+                guidance_scale=self.cfg_scale,
+                width=width,
+                height=height,
+                generator=generator,
+            ).images[0]
+            return image.convert("RGB")
+        except torch.cuda.OutOfMemoryError:
+            # first image ran out of VRAM - fall back to CPU offload and retry once
+            try:
+                pipe.enable_model_cpu_offload()
+            except Exception:
+                pass
+            image = pipe(
+                prompt=f"{prompt}, {self.style}",
+                negative_prompt=self.negative,
+                num_inference_steps=self.steps,
+                guidance_scale=self.cfg_scale,
+                width=width,
+                height=height,
+                generator=generator,
+            ).images[0]
+            return image.convert("RGB")
 
 
 class SDWebUI:

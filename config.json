@@ -25,8 +25,9 @@
     "comfyui_workflow_file": "",
     "diffusers": {
       "model_name": "",
-      "model_path": "D:\\stable-diffusion-webui\\models\\Stable-diffusion\\Realistic_Vision_V5.1_fp16-no-ema.safetensors",
-      "hf_cache_dir": "D:\\hf_cache"
+      "model_path": "D:\\stable-diffusion-webui\\models\\Stable-diffusion\\RealVisXL_V4.0.safetensors",
+      "hf_cache_dir": "D:\\hf_cache",
+      "cpu_offload": false
     },
     "openai": {
       "api_key": "",
@@ -34,7 +35,7 @@
       "image_model": "gpt-image-1",
       "size": "1024x1024"
     },
-    "cover_size": [768, 1088],
+    "cover_size": [896, 1152],
     "back_cover": "reuse"
   },
   "pdf": {
