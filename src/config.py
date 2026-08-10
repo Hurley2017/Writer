@@ -32,7 +32,10 @@ DEFAULTS = {
         "cover_size": [896, 1152],
         "back_cover": "reuse",
     },
-    "pdf": {"divider": True},
+    "pdf": {"divider": True, "image_max_width": 300, "image_max_height": 340},
+    "tts": {"backend": "orpheus", "voice": "", "voice_female": "jess",
+             "voice_male": "zac", "narrator": "auto", "style": "",
+             "model": "", "hf_cache_dir": ""},
     "output": {"dir": "output", "open_pdf": True},
 }
 

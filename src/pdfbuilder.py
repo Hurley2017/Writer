@@ -24,6 +24,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate,
     Frame,
+    Image as RLImage,
+    KeepTogether,
     NextPageTemplate,
     PageBreak,
     PageTemplate,
@@ -245,6 +247,16 @@ class _StoryDoc(BaseDocTemplate):
 
 # ---------------------------------------------------------------- helpers
 
+def _sized_image(path, max_w, max_h):
+    from PIL import Image as PILImage
+    with PILImage.open(path) as im:
+        w, h = im.size
+    scale = min(max_w / w, max_h / h, 1.0)
+    rl = RLImage(path, width=w * scale, height=h * scale)
+    rl.hAlign = "CENTER"
+    return rl
+
+
 def _para(text, style):
     return Paragraph(sax.escape(text), style)
 
@@ -293,7 +305,16 @@ def _add_chapter_body(flow, doc, chapter, images, prefix, opts):
     n = len(paras)
     for i, p in enumerate(paras):
         flow.append(_para(p, style))
-        if divider and i < n - 1:
+        if i >= n - 1:
+            continue
+        img_path = images.get(f"{prefix}_p{i}")
+        if img_path and os.path.exists(img_path):
+            flow.append(Spacer(0, 4))
+            flow.append(KeepTogether(_sized_image(
+                img_path, opts.get("image_max_width", 300),
+                opts.get("image_max_height", 340))))
+            flow.append(Spacer(0, 4))
+        elif divider:
             flow.append(Spacer(0, 2))
             flow.append(_Divider())
             flow.append(Spacer(0, 2))

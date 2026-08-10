@@ -1,55 +1,72 @@
 # Writer — Local AI Story Writer
 
-An AI agent that writes illustrated stories and renders them into a **PDF book** that
-matches the exact layout of your sample book (`Second Light of March.pdf`): A5 pages,
-Palatino Linotype typography, a cover, a contents page, section title pages, chapters
-with running headers, and abstract ornaments between paragraphs (images only on the cover).
+An AI agent that writes **illustrated stories**, renders them into a **PDF book** that
+matches the exact layout of your sample book (`Second Light of March.pdf`), and narrates
+them into an **audiobook** — all local.
 
-## How it works
+## How it works (three stages)
 
 ```
-story_writer.bat
-      │  asks you: genre, premise, tone, length, title, author
+story_writer.bat  →  write_story.py   (one script, no VS Code needed)
+      │  asks you: genre, premise, tone, length, title, author, language
       ▼
-┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
-│  Local LLM      │      │  Image model     │      │  PDF builder    │
-│  (LM Studio)    │ ───► │  (auto-detect)   │ ───► │  (reportlab)    │
-│  1. outline     │      │  cover          │      │  replicates the │
-│  2. chapters    │      │  illustration   │      │  sample layout  │
-│     image ideas │      │  cover           │      │                 │
-└─────────────────┘      └──────────────────┘      └─────────────────┘
+┌─────────────────────────┐   ┌──────────────────────┐   ┌──────────────────┐
+│ STAGE 1 - draft         │   │ STAGE 2 - images     │   │ STAGE 3 - audio   │
+│ LM Studio (Gemma 31B)   │──►│ RealVisXL (SDXL)     │──►│ Orpheus 3B TTS    │
+│ writes outline+chapters │   │ fills every paragraph│   │ narrates with     │
+│ + draft PDF with        │   │ placeholder with a   │   │ emotion tags +    │
+│ placeholder images      │   │ real illustration    │   │ rebuilds audiobook│
+└─────────────────────────┘   └──────────────────────┘   └──────────────────┘
 ```
 
-1. **LM Studio (local LLM)** writes the story:
-   - An outline (title, prologue, sections → chapters, epilogue, cover idea).
-   - Each chapter as a set of scene-paragraphs (plus a cover prompt).
-2. **Image generation** creates a full-bleed **cover** (and back cover). No
-   in-paragraph pictures — instead, small abstract ornaments are drawn between
-   paragraphs in the PDF.
-3. **PDF builder** lays everything out in the sample book's format and saves it to
-   `output/`.
+1. **STAGE 1 — Draft**: the local LLM (**Gemma 31B** in LM Studio) writes the book
+   (outline → sections → chapters), and for each chapter produces the paragraphs,
+   an **image prompt per paragraph**, and an **emotion per paragraph**. A fast draft
+   PDF is built with placeholder images.
+2. **STAGE 2 — Images**: **RealVisXL (SDXL)** generates the **cover** as a real picture
+   from the story, and one **abstract art** piece per paragraph (themed by that
+   paragraph's emotion - calm, sad, tense, joyful...), then rebuilds the final PDF.
+   The SDXL model is unloaded from the GPU as soon as the images are done.
+3. **STAGE 3 — Audio**: **Orpheus 3B** (local, GPU-accelerated, ~2.4 GB VRAM in 4-bit)
+   narrates with **dual voices**: each chapter title is ANNOUNCED by one voice and the
+   story body is READ by the other. The narrator voice follows the protagonist's gender
+   (female → `jess`, male → `zac`), decided automatically from the story's
+   `protagonist_gender` field (with `--narrator` override). Emotion tags (`<sigh>`,
+   `<gasp>`, `<laugh>`...) are injected INLINE (after the first sentence) so the model
+   performs them. Output is 24 kHz, per-chapter WAVs + one `audiobook.wav`.
 
 ## Quick start
 
 1. Make sure **LM Studio** is running with the local server enabled
-   (Developer tab → Start Server, default `http://localhost:1234/v1`) and at least one
-   model loaded.
-2. Double-click **`story_writer.bat`**.
-3. Answer the questions (genre, premise, tone, length, title, author).
-4. Wait — the PDF is built and opened automatically.
+   (Developer tab → Start Server, default `http://localhost:1234/v1`) and **Gemma 31B**
+   loaded.
+2. Double-click **`story_writer.bat`** (or run `write_story.py` with the venv Python).
+   No VS Code needed.
+3. Answer the questions (genre, premise, tone, length, title, author, language).
+4. Wait — it runs all three stages: story → draft PDF → real illustrations → final PDF
+   → audiobook, then opens the finished PDF.
 
-You can also run the pipeline directly:
+The first run downloads Orpheus' 4-bit weights (~2.2 GB) and RealVisXL is used from
+`D:\stable-diffusion-webui\models\Stable-diffusion\`; everything is cached on `D:`.
+
+You can also run stages independently (advanced / power use):
 
 ```bat
+:: full pipeline
 py -3 -m src.pipeline --genre "fantasy" --topic "a young cartographer maps an
     uncharted sea" --tone "epic" --length medium
+
+:: only fill real images for an existing story
+py -3 -m src.pipeline --stage images --story output/<book>/story.json
+
+:: only generate the audiobook (Orpheus)
+py -3 -m src.pipeline --stage audio --story output/<book>/story.json
 ```
 
 ## Choosing the image model
 
-Image generation is used **only for the cover** (front + optional back); the story
-body uses small abstract ornaments between paragraphs, not pictures. Two ways to
-generate the cover:
+Image generation produces the **cover** (front + back) **and one illustration per
+paragraph** (the current pipeline default). Two ways to generate them:
 
 ### 1. Embedded Stable Diffusion (standalone — recommended)
 The SD model is loaded **directly inside the pipeline** (HuggingFace `diffusers`) — no
@@ -88,33 +105,41 @@ placeholder**.
 
 | Section | Key | Meaning |
 |---|---|---|
-| `lmstudio` | `base_url`, `model` | LM Studio endpoint; `model` empty = auto-pick the largest loaded model |
+| `lmstudio` | `base_url`, `model` | LM Studio endpoint; `model` = `google/gemma-4-31b-qat` (Gemma 31B) |
 | `lmstudio` | `temperature_*` | Creativity for outline vs. story |
 | `story` | `language`, `length` | Story language and default length (`short`/`medium`/`long`) |
 | `pdf` | `divider` | Draw an abstract ornament between paragraphs (default `true`) |
 | `imagegen` | `backend`, `style_prompt`, `negative_prompt` | Image backend + art style keywords |
-| `imagegen` | `width`, `height`, `steps`, `cfg_scale`, `sampler` | SD WebUI settings |
+| `imagegen` | `width`, `height`, `steps`, `cfg_scale`, `sampler` | SD settings |
+| `imagegen.diffusers` | `model_path`, `hf_cache_dir` | SDXL checkpoint path + HF cache on `D:` |
+| `tts` | `backend`, `voice_female`, `voice_male` | `orpheus`; female narrator (`jess`) + male narrator (`zac`) |
+| `tts` | `narrator` | `auto` (from story) / `male` / `female` - which voice reads the body |
+| `tts` | `model`, `hf_cache_dir` | 4-bit Orpheus repo id + HF cache dir |
 | `pdf` | `divider` | Abstract ornament between paragraphs (default `true`) |
 
 ## Output
 
 Each run creates `output/<title>-<timestamp>/` containing:
 
-- `<title>.pdf` — the finished book
-- `images/` — the generated cover (`cover.png`)
-- `story.json` — the full story (paragraphs) for reuse
+- `<title>.pdf` — the finished book (picture cover + abstract art per paragraph)
+- `<title>-draft.pdf` — fast draft with placeholder cards
+- `images/` — the generated cover + per-paragraph abstract art
+- `audio/` — per-chapter WAVs + `audiobook.wav` (24 kHz, Orpheus dual voices)
+- `story.json` — the full story (paragraphs, image prompts, emotions) for reuse
 
 ## Project layout
 
 ```
-story_writer.bat      Interactive launcher (asks for genre, etc.)
-config.json           Settings (LM Studio, image backend, layout)
+story_writer.bat      Double-click launcher (finds Python, checks deps, runs the script)
+write_story.py        THE single script - interactive, runs the full 3-stage pipeline
+config.json           Settings (LM Studio, image backend, TTS voice, layout)
 src/
   pipeline.py         End-to-end orchestration + CLI
   lmstudio.py         LM Studio (OpenAI-compatible) client
   storygen.py         Outline + chapter generation (strict JSON, retries)
-  imagegen.py         Image backends (SD WebUI / ComfyUI / OpenAI / placeholder)
+  imagegen.py         Image backends (diffusers / SD WebUI / ComfyUI / OpenAI / placeholder)
   pdfbuilder.py       PDF layout replicating the sample book
+  tts.py              Orpheus 3B audiobook (emotion tags, SNAC decode)
 tools/                Analysis + test scripts for the layout
 ```
 
@@ -137,5 +162,13 @@ The sample PDF was analyzed with PyMuPDF and reproduced in `pdfbuilder.py`:
 - **"Model did not return valid JSON"** → a small model occasionally writes prose
   instead of JSON. The pipeline retries automatically; if it still fails, pick a
   larger model in the advanced menu (or `--model <id>`).
-- **No images / placeholder cards** → no local image server was detected. Start
-  Stable Diffusion WebUI or set an OpenAI key.
+- **No images / placeholder cards** → no local image backend was detected. Set
+  `config.json → imagegen.diffusers.model_path` to the RealVisXL checkpoint
+  (embedded diffusers, recommended) or start a server.
+- **Orpheus model download fails** → the 4-bit model is fetched from HuggingFace
+  (`unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit`) into `D:\hf_cache`. If it fails,
+  check the cache dir has space, or set `tts.model` in `config.json` to another
+  public mirror.
+- **Slow / CPU-only TTS** → the 4-bit model must load on CUDA (it reports
+  `Orpheus on cuda:0`). VRAM used is ~2.4 GB at load and up to ~7 GB during
+  generation on the RTX 5060 — close the SD stage before generating audio if tight.

@@ -1,7 +1,7 @@
 {
   "lmstudio": {
     "base_url": "http://localhost:1234/v1",
-    "model": "llama-3.2-3b-instruct",
+    "model": "google/gemma-4-31b-qat",
     "temperature_outline": 0.7,
     "temperature_story": 0.9,
     "max_tokens": 4096
@@ -19,7 +19,6 @@
     "steps": 32,
     "cfg_scale": 7,
     "sampler": "DPM++ 2M Karras",
-    "seed": -1,
     "sdwebui_url": "http://127.0.0.1:7860",
     "comfyui_url": "http://127.0.0.1:8188",
     "comfyui_workflow_file": "",
@@ -35,11 +34,26 @@
       "image_model": "gpt-image-1",
       "size": "1024x1024"
     },
-    "cover_size": [896, 1152],
-    "back_cover": "reuse"
+    "cover_size": [
+      896,
+      1152
+    ],
+    "back_cover": "reuse",
+    "seed": -1
   },
   "pdf": {
-    "divider": true
+    "divider": true,
+    "image_max_width": 300,
+    "image_max_height": 340
+  },
+  "tts": {
+    "backend": "orpheus",
+    "voice_female": "jess",
+    "voice_male": "zac",
+    "narrator": "auto",
+    "style": "",
+    "model": "unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit",
+    "hf_cache_dir": "D:\\hf_cache"
   },
   "output": {
     "dir": "output",

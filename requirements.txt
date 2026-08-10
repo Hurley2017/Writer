@@ -4,9 +4,17 @@ reportlab>=4.0
 PyMuPDF>=1.24
 
 # Embedded Stable Diffusion (standalone image generation). Install with CUDA support:
-#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
 # (diffusers/transformers/accelerate/safetensors are pulled in automatically)
 diffusers>=0.30
 transformers>=4.44
 accelerate>=0.34
 safetensors>=0.4
+
+# Audiobook narration (Orpheus 3B - local expressive TTS with emotion tags).
+# The 3B model itself is fetched from HuggingFace on first run to D:\hf_cache
+# (4-bit weights: unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit).
+snac>=1.0
+bitsandbytes>=0.45
+soundfile>=0.12
+numpy>=1.26

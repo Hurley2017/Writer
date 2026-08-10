@@ -13,9 +13,18 @@ Supported backends:
 import base64
 import io
 import os
+import warnings
 
 import requests
 from PIL import Image, ImageDraw, ImageFont
+
+# ---- silence known-harmless third-party warnings (torchvision fallback, deprecations) ----
+warnings.filterwarnings("ignore", message=".*requires torchvision.*")
+warnings.filterwarnings("ignore", message=".*Siglip.*")
+warnings.filterwarnings("ignore", message=".*deprecated.*")
+warnings.filterwarnings("ignore", message=".*kept in float32.*")
+warnings.filterwarnings("ignore", message=".*triton not found.*")
+warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
 
 STYLE_KEYWORDS = ["cinematic", "illustration", "storybook"]
 
@@ -85,8 +94,10 @@ class DiffusersSD:
         self.seed = int(g.get("seed", -1))
         self._pipe = None
         if self.hf_cache_dir:
-            os.environ.setdefault("HF_HOME", self.hf_cache_dir)
-            os.environ.setdefault("HF_HUB_CACHE", os.path.join(self.hf_cache_dir, "hub"))
+            os.environ["HF_HOME"] = self.hf_cache_dir
+            os.environ["HF_HUB_CACHE"] = os.path.join(self.hf_cache_dir, "hub")
+        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS", "1")
+        os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
         if not self.model_name and (not self.model_path or not os.path.exists(self.model_path)):
             raise RuntimeError(
                 "Diffusers backend needs a model. Set imagegen.diffusers.model_name "
@@ -140,8 +151,8 @@ class DiffusersSD:
             # SDXL on 8 GB: keep peak VRAM low by offloading components to CPU/RAM
             try:
                 pipe.enable_attention_slicing()
-                pipe.enable_vae_slicing()
-                pipe.enable_vae_tiling()
+                pipe.vae.enable_slicing()
+                pipe.vae.enable_tiling()
                 pipe.enable_model_cpu_offload()
                 self._pipe = pipe
                 return pipe
@@ -150,22 +161,24 @@ class DiffusersSD:
         pipe = pipe.to("cuda")
         pipe.enable_attention_slicing()  # keeps VRAM usage low on 8 GB cards
         try:
-            pipe.enable_vae_slicing()
-            pipe.enable_vae_tiling()
+            pipe.vae.enable_slicing()
+            pipe.vae.enable_tiling()
         except Exception:
             pass
         self._pipe = pipe
         return pipe
 
-    def generate(self, prompt, width, height):
+    def generate(self, prompt, width, height, style=None):
         import torch
         pipe = self._get_pipe()
         generator = None
         if self.seed >= 0:
             generator = torch.Generator(device="cuda").manual_seed(self.seed)
+        style_suffix = self.style if style is None else (style or "")
+        full = f"{prompt}, {style_suffix}".rstrip(", ") if style_suffix else prompt
         try:
             image = pipe(
-                prompt=f"{prompt}, {self.style}",
+                prompt=full,
                 negative_prompt=self.negative,
                 num_inference_steps=self.steps,
                 guidance_scale=self.cfg_scale,
@@ -181,7 +194,7 @@ class DiffusersSD:
             except Exception:
                 pass
             image = pipe(
-                prompt=f"{prompt}, {self.style}",
+                prompt=full,
                 negative_prompt=self.negative,
                 num_inference_steps=self.steps,
                 guidance_scale=self.cfg_scale,
@@ -190,6 +203,20 @@ class DiffusersSD:
                 generator=generator,
             ).images[0]
             return image.convert("RGB")
+
+    def free(self):
+        """Release the loaded pipeline from GPU memory so the next model can load."""
+        import gc
+        import torch
+        if self._pipe is not None:
+            try:
+                del self._pipe
+            except Exception:
+                pass
+            self._pipe = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 class SDWebUI:
@@ -378,10 +405,12 @@ def create_backend(cfg, force=None):
     return Placeholder(cfg), backend
 
 
-def generate_and_save(backend, prompt, width, height, out_path, caption=None):
+def generate_and_save(backend, prompt, width, height, out_path, caption=None, style=None):
     """Generate one image and save to out_path (PNG). Returns the path."""
     if isinstance(backend, Placeholder):
         img = backend.generate(prompt, width, height, caption=caption)
+    elif style is not None and hasattr(backend, "generate") and isinstance(backend, DiffusersSD):
+        img = backend.generate(prompt, width, height, style=style)
     else:
         img = backend.generate(prompt, width, height)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
