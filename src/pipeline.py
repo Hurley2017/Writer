@@ -221,37 +221,26 @@ def write_story(cfg, args):
 
 
 def generate_all_images(cfg, backend, story, out_dir):
-    """Cover/back + one illustration per paragraph (current chapter/paragraph)."""
+    """Generate only the book cover and reuse it as the back cover."""
     images = {}
     images_dir = os.path.join(out_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
     title = story.get("title", "Story")
     cw, chh = cfg["imagegen"]["cover_size"]
+
+    if cfg["imagegen"].get("generate_cover_only", True):
+        print("      - Cover image only (no inline page illustrations) ...")
+        images["cover"] = imagegen.generate_and_save(
+            backend, story.get("cover_prompt") or f"an atmospheric cover for '{title}'",
+            cw, chh, os.path.join(images_dir, "cover.png"), caption=title)
+        images["back"] = images["cover"]
+        return images
+
     print("      - Cover image ...")
     images["cover"] = imagegen.generate_and_save(
         backend, story.get("cover_prompt") or f"an atmospheric cover for '{title}'",
         cw, chh, os.path.join(images_dir, "cover.png"), caption=title)
     images["back"] = images["cover"]
-
-    def paras(prefix, chapter):
-        """Abstract art per paragraph, themed by the paragraph's emotion."""
-        emotions = chapter.get("emotions", []) or []
-        for i, p in enumerate(chapter.get("paragraphs", [])):
-            emotion = emotions[i] if i < len(emotions) else ""
-            prompt = ABSTRACT_ART.get((emotion or "").lower().strip(), ABSTRACT_ART[""])
-            print(f"      - {prefix} p{i+1}: abstract art ({emotion or 'neutral'})")
-            images[f"{prefix}_p{i}"] = imagegen.generate_and_save(
-                backend, prompt, cfg["imagegen"]["width"], cfg["imagegen"]["height"],
-                os.path.join(images_dir, f"{prefix}_p{i}.png"),
-                caption=prompt, style="")
-
-    if story.get("prologue"):
-        paras("prologue", story["prologue"])
-    for si, sec in enumerate(story.get("sections", [])):
-        for ci, ch in enumerate(sec.get("chapters", []), start=1):
-            paras(f"s{si}_c{ci}", ch)
-    if story.get("epilogue"):
-        paras("epilogue", story["epilogue"])
     return images
 
 

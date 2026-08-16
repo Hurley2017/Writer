@@ -5,8 +5,8 @@ venv Python:
     D:\\stable-diffusion-webui\\venv\\Scripts\\python.exe write_story.py
 
 It asks what kind of story you want, then runs the whole local pipeline:
-  1. Story   - LM Studio (Gemma 31B) writes the story from your answers
-  2. Images  - RealVisXL (SDXL) illustrates the cover + every paragraph
+  1. Story   - LM Studio writes the story from your answers, and may use CPU offload
+  2. Images  - low-VRAM SD 1.5 renders the cover only to stay under 6 GB VRAM
   3. Audio   - Orpheus 3B narrates the audiobook with emotion cues
 Everything lands in  output/<book title>/  (story.json, images, PDF, audiobook)
 """
@@ -40,7 +40,7 @@ def ask(prompt, default=""):
 def main():
     print("=" * 60)
     print("          AI STORY WRITER - local illustrated audiobooks")
-    print("   story: Gemma 31B (LM Studio)   art: RealVisXL   voice: Orpheus (jess + zac)")
+    print("   story: LM Studio (CPU-offloaded)   art: SD 1.5 cover only   voice: Orpheus (jess + zac)")
     print("=" * 60)
 
     cfg = load_config()

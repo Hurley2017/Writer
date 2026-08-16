@@ -1,31 +1,34 @@
 {
   "lmstudio": {
-    "base_url": "http://localhost:1234/v1",
-    "model": "google/gemma-4-31b-qat",
+    "base_url": "http://localhost:11434/v1",
+    "model": "nous-hermes2:10.7b-solar-q6_K",
+    "offload_to_cpu": true,
     "temperature_outline": 0.7,
     "temperature_story": 0.9,
-    "max_tokens": 4096
+    "max_tokens": 4096,
+    "_note": "Nous Hermes 2 Solar 10.7B (q6_K): optimal for story writing (full system when active)"
   },
   "story": {
     "language": "English",
     "length": "medium"
   },
   "imagegen": {
-    "backend": "auto",
-    "style_prompt": "photorealistic, ultra detailed, professional photography, sharp focus, natural lighting, realistic textures, 8k uhd, film photography",
+    "backend": "diffusers",
+    "generate_cover_only": true,
+    "style_prompt": "photorealistic, ultra detailed, professional photography, sharp focus, natural lighting, realistic textures, cinematic book cover, elegant composition",
     "negative_prompt": "illustration, painting, cartoon, anime, drawing, 3d render, text, watermark, signature, logo, words, letters, low quality, blurry, distorted, deformed, ugly, bad hands, missing fingers, extra limbs, bad anatomy, jpeg artifacts, oversaturated",
-    "width": 640,
-    "height": 640,
-    "steps": 32,
-    "cfg_scale": 7,
+    "width": 512,
+    "height": 512,
+    "steps": 18,
+    "cfg_scale": 6,
     "sampler": "DPM++ 2M Karras",
     "sdwebui_url": "http://127.0.0.1:7860",
     "comfyui_url": "http://127.0.0.1:8188",
     "comfyui_workflow_file": "",
     "diffusers": {
-      "model_name": "",
-      "model_path": "D:\\stable-diffusion-webui\\models\\Stable-diffusion\\RealVisXL_V4.0.safetensors",
-      "hf_cache_dir": "D:\\hf_cache",
+      "model_name": "runwayml/stable-diffusion-v1-5",
+      "model_path": "",
+      "hf_cache_dir": "/home/tusher/hf_cache",
       "cpu_offload": false
     },
     "openai": {
@@ -53,7 +56,7 @@
     "narrator": "auto",
     "style": "",
     "model": "unsloth/orpheus-3b-0.1-ft-unsloth-bnb-4bit",
-    "hf_cache_dir": "D:\\hf_cache"
+    "hf_cache_dir": "/home/tusher/hf_cache"
   },
   "output": {
     "dir": "output",
