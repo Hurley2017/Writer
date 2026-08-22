@@ -24,8 +24,7 @@ while leaving room for the KV cache during generation.
 """
 import os
 import re
-import os
-import re
+import requests
 
 # emotion label -> Orpheus paralinguistic tag appended to the narration text
 EMOTION_TAG = {
@@ -76,6 +75,10 @@ class AudiobookGenerator:
         self.narrator = (self.tcfg.get("narrator", "auto") or "auto").lower().strip()
         self.style = self.tcfg.get("style", "") or ""
         self.hf_cache = self.tcfg.get("hf_cache_dir", "") or ""
+        self.backend = (self.tcfg.get("backend", "") or "orpheus").lower().strip()
+        self.server_url = (self.tcfg.get("server_url", "") or "").rstrip("/")
+        # remote mode: synthesize on the headless server instead of locally
+        self._remote = self.backend in ("orpheus-http", "remote", "http") or bool(self.server_url)
         self._set_hf_env()
         self._model = None
         self._tok = None
@@ -89,6 +92,8 @@ class AudiobookGenerator:
         os.environ["HF_HUB_DISABLE_SYMLINKS"] = "1"
 
     def _get_model(self):
+        if self._remote:
+            return None
         if self._model is not None:
             return self._model
         try:
@@ -212,6 +217,8 @@ class AudiobookGenerator:
 
     def synthesize_text(self, text, cue=None, voice=None):
         """Return a numpy mono float32 audio array for one text chunk."""
+        if self._remote:
+            return self._synthesize_remote(text, cue=cue, voice=voice)
         import torch
 
         model = self._get_model()
@@ -238,6 +245,27 @@ class AudiobookGenerator:
                 pad_token_id=tok.eos_token_id,
             )
         return self._decode_audio(generated, full_ids.shape[1])
+
+    def _synthesize_remote(self, text, cue=None, voice=None):
+        """Call the Orpheus HTTP service on the server; return mono float32 audio."""
+        import io
+        import numpy as np
+        import soundfile as sf
+
+        if not self.server_url:
+            raise AudiobookError(
+                "tts.backend is remote but tts.server_url is not set in config.json.")
+        try:
+            resp = requests.post(
+                self.server_url + "/synthesize",
+                json={"text": text, "cue": cue or "", "voice": voice or "zac"},
+                timeout=600)
+            resp.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            raise AudiobookError(
+                f"TTS server unreachable at {self.server_url}: {e}") from e
+        data, _sr = sf.read(io.BytesIO(resp.content), dtype="float32")
+        return np.asarray(data, dtype=np.float32).reshape(-1)
 
     # ----------------------------------------------------------------
     def _silence(self, seconds):

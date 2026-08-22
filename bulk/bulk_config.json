@@ -1,0 +1,23 @@
+{
+  "bulk": {
+    "cache_dir": "bulk/cache",
+    "state_file": "bulk/state.json",
+    "output_dir": "output",
+    "language": "en",
+    "min_downloads": 5000,
+    "min_words": 1200,
+    "max_chapters_pdf": 200,
+    "cover_size": [896, 1152],
+    "category": "classics",
+    "generated_category": "specials",
+    "ffmpeg_path": "",
+    "librivox": "link",
+    "librivox_max_chapters": 80,
+    "open_pdf": false
+  },
+  "publish": {
+    "supabase_url": "",
+    "admin_email": "",
+    "admin_password": ""
+  }
+}

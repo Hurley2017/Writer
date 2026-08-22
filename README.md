@@ -127,6 +127,21 @@ Each run creates `output/<title>-<timestamp>/` containing:
 - `audio/` — per-chapter WAVs + `audiobook.wav` (24 kHz, Orpheus dual voices)
 - `story.json` — the full story (paragraphs, image prompts, emotions) for reuse
 
+## Run all models on a headless Debian server (GTX 1060)
+
+Instead of running the models on this PC, point the pipeline at a headless
+Debian server on the LAN (`server/` folder in this repo):
+
+| Service | Port | Runs on server | Config key |
+|---|---|---|---|
+| llama.cpp LLM (Qwen2.5-7B Q4) | 1234 | story writer | `lmstudio.base_url` |
+| SD WebUI A1111 (Realistic Vision) | 7860 | cover + abstract art | `imagegen.sdwebui_url` + `backend=sdwebui` |
+| Orpheus 3B TTS | 8000 | audiobook | `tts.server_url` + `backend=orpheus-http` |
+
+`config.json` is pre-wired for `192.168.0.103`. See **`server/README.md`** for
+the one-command install, the model choices (GTX 1060 = SD 1.5, not SDXL; Orpheus
+in float16, not bfloat16), and how to switch back to fully-local.
+
 ## Project layout
 
 ```

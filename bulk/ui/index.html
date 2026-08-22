@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bulk Publisher — writers-palette.com</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#161d2e; --panel2:#1c2540; --border:#2a3550;
+    --text:#e8ecf4; --dim:#8b95ab; --accent:#d4af37; --green:#3ecf8e;
+    --red:#ff6b6b; --amber:#f5b942; --blue:#6ea8fe;
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  body{background:var(--bg); color:var(--text); font:14px/1.45 "Segoe UI",system-ui,sans-serif; padding:20px}
+  header{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:18px}
+  h1{font-size:22px; font-weight:600; letter-spacing:.5px}
+  h1 .gold{color:var(--accent)}
+  .sub{color:var(--dim); font-size:12px}
+  .runbadge{margin-left:auto; padding:6px 14px; border-radius:20px; font-size:13px; font-weight:600;
+    background:var(--panel); border:1px solid var(--border)}
+  .runbadge.running{color:#06130c; background:var(--green); border-color:var(--green)}
+  .runbadge.idle{color:var(--dim)}
+  nav{display:flex; gap:8px; margin-bottom:16px}
+  nav button{padding:9px 18px; border-radius:8px; border:1px solid var(--border); background:var(--panel);
+    color:var(--text); font-size:14px; cursor:pointer}
+  nav button.active{background:var(--accent); color:#141000; border-color:var(--accent); font-weight:600}
+  .tab{display:none}
+  .tab.active{display:block}
+  .panel{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:16px}
+  .panel h2{font-size:15px; margin-bottom:12px; color:var(--accent); letter-spacing:.4px}
+  .panel h2 .hint{color:var(--dim); font-weight:400; font-size:12px; margin-left:8px}
+  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end}
+  .field{display:flex; flex-direction:column; gap:5px}
+  .field label{font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:.5px}
+  input[type=number],input[type=text],select{background:var(--panel2); color:var(--text); border:1px solid var(--border);
+    border-radius:7px; padding:8px 10px; font-size:13px; min-width:120px}
+  input[type=number]{width:90px}
+  input[type=text].wide{width:320px}
+  .btn{background:var(--accent); color:#141000; border:none; border-radius:8px; padding:10px 22px;
+    font-size:14px; font-weight:700; cursor:pointer}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.45; cursor:not-allowed}
+  .btn.ghost{background:transparent; color:var(--text); border:1px solid var(--border)}
+  .btn.danger{background:var(--red); color:#fff}
+  .btn.small{padding:6px 12px; font-size:12px}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{color:var(--dim); text-align:left; font-weight:600; font-size:11px; text-transform:uppercase;
+    letter-spacing:.5px; padding:8px; border-bottom:1px solid var(--border)}
+  td{padding:8px; border-bottom:1px solid #1d2740; vertical-align:top}
+  .status{display:inline-block; padding:2px 9px; border-radius:12px; font-size:11px; font-weight:700}
+  .status.published{background:#0d3b26; color:var(--green)}
+  .status.ready{background:#3a2f08; color:var(--amber)}
+  .status.failed{background:#3b1212; color:var(--red)}
+  .status.planned{background:#10233f; color:var(--blue)}
+  .status.skipped{background:#2a2f3a; color:var(--dim)}
+  .badge{display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border-radius:8px;
+    font-size:12px; background:var(--panel2); border:1px solid var(--border); margin:0 8px 8px 0}
+  .dot{width:9px; height:9px; border-radius:50%; flex:none}
+  .dot.ok{background:var(--green); box-shadow:0 0 6px var(--green)}
+  .dot.bad{background:var(--red); box-shadow:0 0 6px var(--red)}
+  .dot.warn{background:var(--amber); box-shadow:0 0 6px var(--amber)}
+  #log{background:#0a0e18; border:1px solid var(--border); border-radius:10px; padding:14px;
+    height:480px; overflow-y:auto; font:12px/1.5 "Cascadia Code",Consolas,monospace; white-space:pre-wrap; word-break:break-word}
+  #log .dim{color:#5b6478}
+  .cand{display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center;
+    padding:8px 10px; border-bottom:1px solid #1d2740}
+  .cand:hover{background:var(--panel2)}
+  .cand .dl{color:var(--dim); font-size:12px}
+  .cand input{accent-color:var(--accent); width:16px; height:16px}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:6px 18px; font-size:13px}
+  .kv dt{color:var(--dim)}
+  .kv dd{color:var(--text)}
+  .muted{color:var(--dim)}
+  .err{color:var(--red)}
+  .scroll{max-height:420px; overflow-y:auto}
+  .flex{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .right{margin-left:auto}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1><span class="gold">BULK</span> PUBLISHER</h1>
+    <div class="sub">writers-palette.com · classics (Gutendex → PDF → LibriVox) · generated (AI story → cover → audio)</div>
+  </div>
+  <div class="runbadge" id="runbadge">idle</div>
+</header>
+
+<nav>
+  <button class="active" data-tab="produce">Produce</button>
+  <button data-tab="library">Library</button>
+  <button data-tab="log">Log</button>
+  <button data-tab="health">Models / Health</button>
+</nav>
+
+<!-- ─────────── PRODUCE ─────────── -->
+<div class="tab active" id="tab-produce">
+  <div class="panel">
+    <h2>Track 1 · Classics <span class="hint">public-domain books — no LLM needed</span></h2>
+    <div class="row">
+      <div class="field"><label>How many books</label><input type="number" id="cl_count" value="3" min="1" max="20"></div>
+      <div class="field"><label>Curated Gutenberg ids (optional)</label><input type="text" id="cl_curated" class="wide" placeholder="e.g. 1342, 84, 11 — empty = most popular"></div>
+      <div class="field"><label>LibriVox audio</label>
+        <select id="cl_librivox">
+          <option value="link">link (record URL)</option>
+          <option value="upload">upload chapters</option>
+          <option value="skip">skip</option>
+        </select>
+      </div>
+      <div class="field"><label>Covers</label>
+        <select id="cl_covers">
+          <option value="type">typographic (fast)</option>
+          <option value="sd">Stable Diffusion art</option>
+        </select>
+      </div>
+      <div class="field"><label>Category</label>
+        <select id="cl_category"><option value="classics">classics</option><option value="specials">specials</option></select>
+      </div>
+      <div class="field"><label>Publish to site</label>
+        <select id="cl_publish"><option value="0">no (produce only)</option><option value="1">yes</option></select>
+      </div>
+    </div>
+    <div class="flex" style="margin-top:14px">
+      <button class="btn" id="run_classics">▶ Produce classics</button>
+      <button class="btn ghost small" id="load_candidates">Load top candidates</button>
+      <span style="width:1px;height:28px;background:var(--border)"></span>
+      <button class="btn ghost" id="backfill_covers" title="Regenerate covers of already-produced classics with Stable Diffusion art">🖼 Backfill AI covers</button>
+      <span class="field" style="flex-direction:row;align-items:center;gap:6px">
+        <label style="text-transform:none;font-size:12px">re-publish after</label>
+        <select id="bf_publish" style="min-width:60px;padding:6px">
+          <option value="0">no</option><option value="1">yes</option>
+        </select>
+      </span>
+    </div>
+    <div id="candidates" style="margin-top:14px"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Track 2 · Generated <span class="hint">on-device AI book — needs LM Studio + SD + TTS running</span></h2>
+    <div class="row">
+      <div class="field"><label>How many books</label><input type="number" id="gn_count" value="1" min="1" max="10"></div>
+      <div class="field"><label>Author pen name</label><input type="text" id="gn_author" class="wide" placeholder="(optional)"></div>
+      <div class="field"><label>Length</label>
+        <select id="gn_length"><option value="medium">medium</option><option value="short">short</option><option value="long">long</option></select>
+      </div>
+      <div class="field"><label>Narrator</label>
+        <select id="gn_narrator"><option value="auto">auto</option><option value="male">male</option><option value="female">female</option></select>
+      </div>
+      <div class="field"><label>Publish to site</label>
+        <select id="gn_publish"><option value="0">no (produce only)</option><option value="1">yes</option></select>
+      </div>
+    </div>
+    <div class="flex" style="margin-top:14px">
+      <button class="btn" id="run_generated">▶ Produce generated books</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── LIBRARY ─────────── -->
+<div class="tab" id="tab-library">
+  <div class="panel">
+    <div class="flex">
+      <h2 style="margin-bottom:0">Library <span class="hint">from bulk/state.json</span> <span id="libsummary" class="hint"></span></h2>
+      <div class="right">
+        <button class="btn ghost small" id="publish_ready" title="Publish books that are produced locally but not yet on the website (no-duplicate guard applies)">⬆ Publish ready</button>
+      </div>
+    </div>
+    <div class="scroll"><table>
+      <thead><tr><th>Title</th><th>Track</th><th>Status</th><th>Gutenberg</th><th>LibriVox</th><th>Cover</th><th>Output</th></tr></thead>
+      <tbody id="libbody"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ─────────── LOG ─────────── -->
+<div class="tab" id="tab-log">
+  <div class="panel">
+    <div class="flex">
+      <h2 style="margin-bottom:0">Run log</h2>
+      <div class="right flex">
+        <button class="btn danger small" id="stop_run">■ Stop run</button>
+        <button class="btn ghost small" id="clear_log">Clear</button>
+      </div>
+    </div>
+    <div id="log" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ─────────── HEALTH ─────────── -->
+<div class="tab" id="tab-health">
+  <div class="panel">
+    <h2>Models &amp; services</h2>
+    <div id="healthbadges"></div>
+    <div class="kv" id="healthdetail" style="margin-top:12px"></div>
+    <div style="margin-top:14px"><button class="btn ghost small" id="refresh_health">↻ Re-check</button></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const state = { logAfter: 0, candidates: [], lastRunId: null };
+
+/* tabs */
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  $('tab-' + b.dataset.tab).classList.add('active');
+  if (b.dataset.tab === 'library') loadLibrary();
+  if (b.dataset.tab === 'health') loadHealth();
+});
+
+/* run a classics batch */
+$('run_classics').onclick = async () => {
+  const opts = {
+    librivox: $('cl_librivox').value,
+    sd_covers: $('cl_covers').value === 'sd',
+    category: $('cl_category').value,
+  };
+  const curated = $('cl_curated').value.split(',').map(s => parseInt(s.trim(), 10)).filter(Boolean);
+  await startRun({
+    classics: parseInt($('cl_count').value, 10) || 1,
+    curated: curated.length ? curated : undefined,
+    no_publish: $('cl_publish').value !== '1',
+    options: opts,
+  });
+};
+
+/* publish books produced locally but not yet on the website */
+$('publish_ready').onclick = async () => {
+  await startRun({ action: 'publish_ready', options: {} });
+};
+
+/* backfill AI covers for existing classics */
+$('backfill_covers').onclick = async () => {
+  await startRun({
+    action: 'backfill',
+    no_publish: $('bf_publish').value !== '1',
+    options: {},
+  });
+};
+
+/* run a generated batch */
+$('run_generated').onclick = async () => {
+  const opts = {
+    length: $('gn_length').value,
+    author: $('gn_author').value.trim(),
+    narrator: $('gn_narrator').value,
+  };
+  await startRun({
+    generated: parseInt($('gn_count').value, 10) || 1,
+    no_publish: $('gn_publish').value !== '1',
+    options: opts,
+  });
+};
+
+async function startRun(payload) {
+  const r = await fetch('/api/run', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+  const j = await r.json();
+  if (!r.ok) { alert(j.error || 'run failed to start'); return; }
+  state.logAfter = 0;
+  $('log').textContent = '';
+  state.lastRunId = j.run_id;
+  showTab('log');
+}
+
+$('stop_run').onclick = async () => { await fetch('/api/stop', {method:'POST'}); };
+$('clear_log').onclick = () => { $('log').textContent = ''; state.logAfter = 0; };
+$('refresh_health').onclick = async () => {
+  $('healthbadges').innerHTML = '<span class="muted">checking…</span>';
+  await loadHealth(true);
+};
+
+/* candidates */
+$('load_candidates').onclick = async () => {
+  const n = 25;
+  const r = await fetch('/api/candidates?n=' + n);
+  const list = await r.json();
+  state.candidates = list;
+  const box = $('candidates');
+  box.innerHTML = '<h3 style="font-size:13px;color:var(--dim);margin-bottom:8px">Top Gutendex candidates — tick to add to curated</h3>';
+  const wrap = document.createElement('div');
+  list.forEach(c => {
+    const d = document.createElement('div'); d.className = 'cand';
+    d.innerHTML = `<input type="checkbox" value="${c.id}"><div><div>${escapeHtml(c.title)}</div><div class="dl">${escapeHtml(c.author)}</div></div><div class="dl">${c.downloads.toLocaleString()} dl</div>`;
+    wrap.appendChild(d);
+  });
+  box.appendChild(wrap);
+  const add = document.createElement('div'); add.style.marginTop = '10px';
+  add.innerHTML = '<button class="btn small ghost" id="add_selected">+ Add selected to curated</button>';
+  box.appendChild(add);
+  $('add_selected').onclick = () => {
+    const ids = [...wrap.querySelectorAll('input:checked')].map(i => i.value);
+    if (!ids.length) return;
+    const cur = $('cl_curated').value.split(',').map(s => s.trim()).filter(Boolean);
+    $('cl_curated').value = [...new Set([...cur, ...ids])].join(', ');
+  };
+};
+
+function escapeHtml(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* library */
+async function loadLibrary() {
+  const r = await fetch('/api/state');
+  const j = await r.json();
+  const s = j.summary || {};
+  $('libsummary').textContent = `(${s.total} total · ${s.published} published · ${s.ready} ready · ${s.skipped||0} skipped · ${s.failed} failed)`;
+  const body = $('libbody');
+  body.innerHTML = (j.books || []).slice().reverse().map(b => {
+    const lv = b.librivox ? '✓' : '';
+    const coverKind = b.cover_kind === 'sd' ? '<span class="status ready">AI</span>' : '<span class="status planned">type</span>';
+    return `<tr>
+      <td><b>${escapeHtml(b.title)}</b><div class="muted">${escapeHtml(b.author||'')}</div></td>
+      <td>${escapeHtml(b.source)}</td>
+      <td><span class="status ${escapeHtml(b.status)}">${escapeHtml(b.status)}</span>${b.error ? `<div class="err" style="font-size:11px;margin-top:3px">${escapeHtml(String(b.error).slice(0,80))}</div>`:''}</td>
+      <td>${b.gutenberg_id ? '#' + b.gutenberg_id : '—'}</td>
+      <td>${lv}</td>
+      <td>${coverKind}</td>
+      <td class="muted" style="font-size:11px">${escapeHtml((b.output_dir||'').split('\\').pop())}</td>
+    </tr>`;
+  }).join('');
+  $('runbadge').className = 'runbadge ' + (j.run?.running ? 'running' : 'idle');
+  $('runbadge').textContent = j.run?.running ? `● running ${j.run.run_id}` : 'idle';
+  /* a new run replaces the server log buffer — reset the local view */
+  if (j.run?.run_id && j.run.run_id !== state.lastRunId) {
+    state.lastRunId = j.run.run_id;
+    state.logAfter = 0;
+    $('log').textContent = '';
+  }
+}
+
+/* health */
+async function loadHealth(force) {
+  const r = await fetch('/api/health' + (force ? '?refresh=1' : ''));
+  const h = await r.json();
+  const badges = [];
+  const add = (key, label, ok, warn) => badges.push(
+    `<span class="badge"><span class="dot ${ok ? 'ok' : warn ? 'warn' : 'bad'}"></span>${label}</span>`);
+  add('llm', 'LLM (LM Studio)', h.llm.ok, false);
+  add('img', 'Stable Diffusion', h.image.ok, false);
+  add('tts', 'TTS / ffmpeg', h.tts.ok, false);
+  add('py', 'Python env', h.python.ok, false);
+  add('sec', 'Publish credentials', h.secrets.ok, true);
+  $('healthbadges').innerHTML = badges.join('');
+  $('healthdetail').innerHTML = `
+    <dt>LLM server</dt><dd>${h.llm.ok ? h.llm.url + ' — loaded: ' + (h.llm.loaded.join(', ') || 'none') : '<span class="err">' + escapeHtml(h.llm.note) + '</span>'}</dd>
+    <dt>Image backend</dt><dd>${escapeHtml(h.image.backend)} — model exists: ${h.image.model_exists ? 'yes' : 'no'}<br><span class="muted">${escapeHtml(h.image.note)}</span></dd>
+    <dt>TTS</dt><dd>backend=${escapeHtml(h.tts.backend)} · orpheus cached: ${h.tts.orpheus_cached ? 'yes' : 'no'} · supertonic: ${h.tts.supertonic_installed ? 'yes' : 'no'} · ffmpeg: ${h.tts.ffmpeg ? 'yes' : '<span class="err">missing</span>'}</dd>
+    <dt>Python</dt><dd>${escapeHtml(h.python.python)}<br><span class="muted">torch=${h.python.torch?'✓':'✗'} diffusers=${h.python.diffusers?'✓':'✗'} flask=${h.python.flask?'✓':'✗'} (generated track needs torch+diffusers)</span></dd>
+    <dt>Secrets</dt><dd>${h.secrets.ok ? 'secrets.json present — publishing enabled' : '<span class="err">' + escapeHtml(h.secrets.note) + '</span>'}</dd>`;
+}
+
+/* live log */
+async function pollLog() {
+  const r = await fetch('/api/logs?after=' + state.logAfter);
+  const j = await r.json();
+  if (j.lines?.length) {
+    const log = $('log');
+    const auto = log.scrollTop + log.clientHeight >= log.scrollHeight - 40;
+    const frag = document.createDocumentFragment();
+    j.lines.forEach(l => { const d = document.createElement('div'); d.textContent = l; frag.appendChild(d); });
+    log.appendChild(frag);
+    state.logAfter = j.after;
+    if (auto) log.scrollTop = log.scrollHeight;
+  }
+}
+
+function showTab(name){ document.querySelector(`nav button[data-tab="${name}"]`).click(); }
+setInterval(pollLog, 1000);
+setInterval(loadLibrary, 4000);
+loadHealth();
+</script>
+</body>
+</html>

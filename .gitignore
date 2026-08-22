@@ -1,8 +1,16 @@
 # Sample book - keep out of version control
 Second Light of March.pdf
 
+# Fish Audio API key - never commit
+.fish_key
+
 # Generated story books, images, and story JSON
 output/
+
+# Bulk publisher - secrets, state, downloads (never commit)
+bulk/secrets.json
+bulk/state.json
+bulk/cache/
 
 # Python
 __pycache__/
